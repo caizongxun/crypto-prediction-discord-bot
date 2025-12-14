@@ -402,10 +402,10 @@ async def initialize_bot():
     logger.info("🚀 Initializing Crypto Prediction Discord Bot")
     logger.info("="*60)
     
-    # Initialize predictor
+    # Initialize predictor with correct folder name
     predictor = CryptoPredictor(
         hf_repo="zongowo111/crypto_model",
-        hf_folder="model"
+        hf_folder="models"  # Correct folder name
     )
     
     # Load models
