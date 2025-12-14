@@ -24,7 +24,7 @@ class CryptoPredictor:
     - Signal generation
     """
     
-    def __init__(self, hf_repo: str = "zongowo111/crypto_model", hf_folder: str = "model"):
+    def __init__(self, hf_repo: str = "zongowo111/crypto_model", hf_folder: str = "models"):
         self.model_manager = ModelManager(hf_repo=hf_repo, hf_folder=hf_folder)
         self.data_fetcher = DataFetcher()
         self.analyzer = TechnicalAnalyzer()
