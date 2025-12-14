@@ -69,9 +69,9 @@ class ModelManager:
     - Display model info for debugging
     """
     
-    def __init__(self, hf_repo: str = "zongowo111/crypto_model", hf_folder: str = "model", cache_dir: str = "./models"):
+    def __init__(self, hf_repo: str = "zongowo111/crypto_model", hf_folder: str = "models", cache_dir: str = "./models"):
         self.hf_repo = hf_repo
-        self.hf_folder = hf_folder
+        self.hf_folder = hf_folder  # Changed from 'model' to 'models' (actual folder name)
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(exist_ok=True)
         
@@ -92,15 +92,20 @@ class ModelManager:
         try:
             logger.info(f"📋 Fetching model list from {self.hf_repo}/{self.hf_folder}...")
             
+            # Get all files in the repo
             files = list_repo_files(repo_id=self.hf_repo, repo_type="model")
             
             symbols = []
             for file in files:
-                # Match pattern: <SYMBOL>_model_v8.pth
+                # Match patterns:
+                # 1. models/BTC_model_v8.pth
+                # 2. models/BTC_model_v9.pth
+                # etc.
                 match = re.match(rf"^{self.hf_folder}/([A-Za-z]+)_model_v\d+\.pth$", file)
                 if match:
                     symbol = match.group(1).upper()
                     symbols.append(symbol)
+                    logger.debug(f"  Found: {symbol} from {file}")
             
             self.available_symbols = sorted(list(set(symbols)))
             logger.info(f"✓ Found {len(self.available_symbols)} models: {', '.join(self.available_symbols)}")
@@ -158,18 +163,45 @@ class ModelManager:
             # Download from Hugging Face
             logger.info(f"  Downloading {symbol} model from Hugging Face...")
             
+            # Try to download - will try different versions if needed
             hf_filename = f"{self.hf_folder}/{symbol}_model_v8.pth"
             
-            model_path = hf_hub_download(
-                repo_id=self.hf_repo,
-                filename=hf_filename,
-                repo_type="model",
-                local_dir=str(self.cache_dir),
-                local_dir_use_symlinks=False
-            )
+            try:
+                model_path = hf_hub_download(
+                    repo_id=self.hf_repo,
+                    filename=hf_filename,
+                    repo_type="model",
+                    local_dir=str(self.cache_dir),
+                    local_dir_use_symlinks=False
+                )
+                logger.info(f"  ✓ Downloaded {symbol} model")
+                return self._load_checkpoint(symbol, model_path)
             
-            logger.info(f"  ✓ Downloaded {symbol} model")
-            return self._load_checkpoint(symbol, model_path)
+            except Exception as download_error:
+                logger.warning(f"  Could not download {hf_filename}: {str(download_error)[:100]}")
+                
+                # Try to find any version of the model
+                logger.info(f"  Searching for any available version of {symbol}...")
+                files = list_repo_files(repo_id=self.hf_repo, repo_type="model")
+                
+                for file in files:
+                    if f"{self.hf_folder}/{symbol}_model" in file and file.endswith('.pth'):
+                        logger.info(f"  Found: {file}")
+                        try:
+                            model_path = hf_hub_download(
+                                repo_id=self.hf_repo,
+                                filename=file,
+                                repo_type="model",
+                                local_dir=str(self.cache_dir),
+                                local_dir_use_symlinks=False
+                            )
+                            logger.info(f"  ✓ Downloaded {symbol} from {file}")
+                            return self._load_checkpoint(symbol, model_path)
+                        except:
+                            continue
+                
+                logger.error(f"  ✗ No suitable model found for {symbol}")
+                return None
         
         except Exception as e:
             logger.error(f"  ✗ Failed to load {symbol}: {e}")
@@ -180,7 +212,7 @@ class ModelManager:
         Load checkpoint and create model
         """
         try:
-            checkpoint = torch.load(model_path, map_location=self.device)
+            checkpoint = torch.load(str(model_path), map_location=self.device)
             
             # Detect architecture
             input_size, hidden_size = self.detect_model_architecture(checkpoint)
@@ -302,3 +334,5 @@ if __name__ == '__main__':
             print(f"\n{symbol}:")
             for key, value in info.items():
                 print(f"  {key}: {value}")
+    else:
+        print("No models found!")
