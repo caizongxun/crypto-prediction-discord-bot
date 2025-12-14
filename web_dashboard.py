@@ -158,7 +158,7 @@ def initialize():
     
     predictor = CryptoPredictor(
         hf_repo="zongowo111/crypto_model",
-        hf_folder="model"
+        hf_folder="models"  # Correct folder name
     )
     
     predictor.initialize()
